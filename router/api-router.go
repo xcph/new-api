@@ -203,6 +203,26 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
+		globalAccessRoute := apiRouter.Group("/global-access")
+		globalAccessRoute.Use(middleware.AdminAuth())
+		{
+			globalAccessRoute.GET("/mode", controller.GetGlobalAccessMode)
+			globalAccessRoute.PUT("/mode", controller.UpdateGlobalAccessMode)
+			globalAccessRoute.GET("/whitelist", controller.GetGlobalWhitelist)
+			globalAccessRoute.POST("/whitelist", controller.CreateGlobalWhitelist)
+			globalAccessRoute.DELETE("/whitelist/:id", controller.DeleteGlobalWhitelist)
+			globalAccessRoute.GET("/blacklist", controller.GetGlobalBlacklist)
+			globalAccessRoute.POST("/blacklist", controller.CreateGlobalBlacklist)
+			globalAccessRoute.DELETE("/blacklist/:id", controller.DeleteGlobalBlacklist)
+		}
+		adminTokensRoute := apiRouter.Group("/admin/tokens")
+		adminTokensRoute.Use(middleware.AdminAuth())
+		{
+			adminTokensRoute.GET("/", controller.AdminListAllTokens)
+			adminTokensRoute.GET("/:id/detail", controller.AdminGetTokenDetail)
+			adminTokensRoute.GET("/:id", controller.AdminGetTokenByID)
+			adminTokensRoute.PUT("/:id/status", controller.AdminUpdateTokenStatus)
+		}
 		channelRoute := apiRouter.Group("/channel")
 		channelRoute.Use(middleware.AdminAuth())
 		{

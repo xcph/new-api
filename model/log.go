@@ -479,3 +479,61 @@ func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64,
 
 	return total, nil
 }
+
+// GetTokenConsumeAggInRange 统计某令牌在时间范围内的消耗日志：额度合计与调用次数（仅 type=consume）。
+func GetTokenConsumeAggInRange(tokenId int, startTs, endTs int64) (sumQuota int, callCount int64, err error) {
+	tx := LOG_DB.Model(&Log{}).Where("token_id = ? AND type = ?", tokenId, LogTypeConsume)
+	if startTs > 0 {
+		tx = tx.Where("created_at >= ?", startTs)
+	}
+	if endTs > 0 {
+		tx = tx.Where("created_at <= ?", endTs)
+	}
+	var out struct {
+		Sum int   `gorm:"column:sq"`
+		Cnt int64 `gorm:"column:cnt"`
+	}
+	err = tx.Select("COALESCE(SUM(quota),0) as sq, COUNT(*) as cnt").Scan(&out).Error
+	return out.Sum, out.Cnt, err
+}
+
+// ListDistinctIPsForToken 在时间范围内从消耗日志中提取去重后的 IP（最多 maxN 条）。
+func ListDistinctIPsForToken(tokenId int, startTs, endTs int64, maxN int) ([]string, error) {
+	if maxN <= 0 {
+		maxN = 500
+	}
+	tx := LOG_DB.Model(&Log{}).Where("token_id = ? AND type = ? AND ip != ?", tokenId, LogTypeConsume, "")
+	if startTs > 0 {
+		tx = tx.Where("created_at >= ?", startTs)
+	}
+	if endTs > 0 {
+		tx = tx.Where("created_at <= ?", endTs)
+	}
+	var ips []string
+	err := tx.Distinct("ip").Order("ip asc").Limit(maxN).Pluck("ip", &ips).Error
+	return ips, err
+}
+
+// ListRecentConsumeLogsForToken 返回时间范围内最近若干条消耗日志（用于详情抽样）。
+func ListRecentConsumeLogsForToken(tokenId int, startTs, endTs int64, limit int) ([]*Log, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	tx := LOG_DB.Model(&Log{}).Where("token_id = ? AND type = ?", tokenId, LogTypeConsume)
+	if startTs > 0 {
+		tx = tx.Where("created_at >= ?", startTs)
+	}
+	if endTs > 0 {
+		tx = tx.Where("created_at <= ?", endTs)
+	}
+	var logs []*Log
+	err := tx.Order("id desc").Limit(limit).Find(&logs).Error
+	if err != nil {
+		return nil, err
+	}
+	formatUserLogs(logs, 0)
+	return logs, nil
+}

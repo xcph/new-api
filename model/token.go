@@ -78,6 +78,20 @@ func (token *Token) GetIpLimits() []string {
 	return ipLimits
 }
 
+// ListAllTokensForAdmin 管理员分页列出全部令牌（可选按 user_id 过滤）。
+func ListAllTokensForAdmin(startIdx, num int, filterUserId int) (tokens []*Token, total int64, err error) {
+	q := DB.Model(&Token{})
+	if filterUserId > 0 {
+		q = q.Where("user_id = ?", filterUserId)
+	}
+	err = q.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	err = q.Order("id desc").Offset(startIdx).Limit(num).Find(&tokens).Error
+	return tokens, total, err
+}
+
 func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	var tokens []*Token
 	var err error
